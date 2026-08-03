@@ -99,6 +99,8 @@ export default function ProductsPage() {
     return result;
   }, [products, category, search]);
 
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
   const handleSubmit = async () => {
     const supabase = createClient();
     const payload = {
@@ -119,20 +121,22 @@ export default function ProductsPage() {
       vat: form.vat || false,
       note: form.note || null,
     };
-    const { error } = await supabase
-      .from("products")
-      .insert(payload as never);
+    const { error } = editingProduct
+      ? await supabase.from("products").update(payload as never).eq("id", editingProduct.id)
+      : await supabase.from("products").insert(payload as never);
     if (error) {
-      console.error("insert product:", error);
-      alert("Không thể thêm sản phẩm: " + error.message);
+      console.error("save product:", error);
+      alert("Không thể lưu sản phẩm: " + error.message);
       return;
     }
     setShowModal(false);
-    // refresh list
-    const { data } = await supabase
-      .from("products")
-      .select("*")
-      .order("name");
+    setEditingProduct(null);
+    refreshProducts();
+  };
+
+  const refreshProducts = async () => {
+    const supabase = createClient();
+    const { data } = await supabase.from("products").select("*").order("name");
     setProducts((data as Product[]) || []);
   };
 
@@ -155,7 +159,7 @@ export default function ProductsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900">Sản phẩm</h1>
-        <Button onClick={() => setShowModal(true)}>Thêm sản phẩm</Button>
+        <Button onClick={() => { setEditingProduct(null); setForm({ name: "", category: "Ốp lưng", sku: "", barcode: "", brand: "", compatible_devices: [], color: "", images: [], date_import: new Date().toISOString().split("T")[0], price_in: 0, price_out: 0, stock_qty: 0, min_stock: 10, status: "active", vat: false, note: "" }); setShowModal(true); }}>Thêm sản phẩm</Button>
       </div>
 
       {/* Filters */}
@@ -193,6 +197,7 @@ export default function ProductsPage() {
                 <th className="text-right px-4 py-3 font-medium text-slate-500">Tồn kho</th>
                 <th className="text-center px-4 py-3 font-medium text-slate-500">VAT</th>
                 <th className="text-center px-4 py-3 font-medium text-slate-500">Trạng thái</th>
+                <th className="text-center px-4 py-3 font-medium text-slate-500">Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -243,9 +248,22 @@ export default function ProductsPage() {
                     </Badge>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <Badge variant={statusVariant(product.status)}>
-                      {product.status === "active" ? "Hoạt động" : "Ngừng bán"}
-                    </Badge>
+                    {product.status === "active" ? "Hoạt động" : "Ngừng bán"}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-blue-600 hover:text-blue-700"
+                      onClick={() => {
+                        setEditingProduct(product);
+                        setForm(product);
+                        setShowModal(true);
+                      }}
+                      title="Sửa sản phẩm"
+                    >
+                      ✏️
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -254,11 +272,14 @@ export default function ProductsPage() {
         </div>
       </Card>
 
-      {/* Add Product Modal */}
+      {/* Product Modal (Add / Edit) */}
       <Modal
         open={showModal}
-        onClose={() => setShowModal(false)}
-        title="Thêm sản phẩm"
+        onClose={() => {
+          setShowModal(false);
+          setEditingProduct(null);
+        }}
+        title={editingProduct ? "Sửa sản phẩm" : "Thêm sản phẩm"}
         size="lg"
       >
         <form
@@ -349,7 +370,7 @@ export default function ProductsPage() {
           </div>
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
             <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>Hủy</Button>
-            <Button type="submit">Thêm sản phẩm</Button>
+            <Button type="submit">{editingProduct ? "Lưu thay đổi" : "Thêm sản phẩm"}</Button>
           </div>
         </form>
       </Modal>
