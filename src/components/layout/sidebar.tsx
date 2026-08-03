@@ -115,7 +115,7 @@ export default function SidebarLayout({
           <div className="w-10" />
         </header>
 
-        <div className="p-6 max-w-6xl mx-auto flex-1">
+        <div className="p-6 w-full flex-1">
           {children}
         </div>
       </main>
