@@ -74,7 +74,7 @@
 ### Sync bridge (Bang Store → Finance App)
 - [x] Trigger tự động tạo transaction khi insert bang_store_sync (personal-finance-app) — ✅ 2026-08-03: trigger `trg_auto_sync_to_tx` (BEFORE INSERT) → tạo `transactions` + cập nhật `balance_current`
 - [ ] FDW connection sang personal-finance-app project
-- [ ] Test data flow thực tế (tạo đơn test → verify transactions + BIDV HKD balance tăng)
+- [x] Test data flow thực tế — ✅ E2E verified 2026-08-03: transfer $500k → BIDV HKD +500k, cash unchanged
 
 ### Chọn khách hàng (hoàn thành)
 - [x] POS: dropdown chọn khách hàng + modal thêm nhanh (name/phone/note) — ✅ 2026-08-03
