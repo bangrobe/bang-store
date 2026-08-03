@@ -8,6 +8,43 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { formatVND, formatDateVN } from "@/lib/utils";
 import { mockProducts, mockSuppliers, type Supplier } from "@/lib/mock";
+import { createClient } from "@/lib/supabase";
+
+// Sync bridge: push purchase order to Finance App as inventory restock
+async function pushPurchaseToFinanceApp(
+  poId: string,
+  lineId: string,
+  productId: string,
+  qty: number,
+  purchaseDate: string,
+  supplierName: string | null
+) {
+  try {
+    const supabase = createClient();
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id ?? "";
+
+    const { data, error } = await supabase
+      .from("bang_store_sync" as any)
+      .insert({
+        bang_store_order_id: poId,
+        bang_store_line_id: lineId,
+        transaction_type: "expense",
+        amount: 0,
+        transaction_date: purchaseDate,
+        merchant_name: supplierName,
+        note: `Restock: ${qty} units`,
+        scope_id: null,
+        sync_status: "pending",
+        synced_by: userId,
+        user_id: userId,
+      });
+    if (error) console.error("pushPurchaseToFinanceApp error:", error.message);
+    else console.log("pushPurchaseToFinanceApp success:", data);
+  } catch (err) {
+    console.error("pushPurchaseToFinanceApp exception:", err);
+  }
+}
 
 export default function PurchasesPage() {
   const [formSupplier, setFormSupplier] = useState("");
