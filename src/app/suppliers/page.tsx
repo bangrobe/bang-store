@@ -24,9 +24,6 @@ export default function SuppliersPage() {
         <h1 className="text-2xl font-bold text-slate-900">
           Nhà cung cấp
         </h1>
-        <Button onClick={() => setShowModal(true)}>
-          Thêm nhà cung cấp
-        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -120,82 +117,11 @@ export default function SuppliersPage() {
             </div>
 
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setShowModal(false)}
-              >
-                Hủy
-              </Button>
               <Button type="submit">Thêm</Button>
             </div>
           </form>
         </Card>
       </div>
-
-      <Modal
-        open={showModal}
-        onClose={() => setShowModal(false)}
-        title="Thêm nhà cung cấp"
-        size="sm"
-      >
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSubmit();
-          }}
-          className="space-y-4"
-        >
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Tên nhà cung cấp *
-            </label>
-            <Input
-              value={form.name}
-              onChange={(e) =>
-                setForm({ ...form, name: e.target.value })
-              }
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Điện thoại *
-            </label>
-            <Input
-              value={form.phone}
-              onChange={(e) =>
-                setForm({ ...form, phone: e.target.value })
-              }
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Ghi chú
-            </label>
-            <Input
-              value={form.note}
-              onChange={(e) =>
-                setForm({ ...form, note: e.target.value })
-              }
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setShowModal(false)}
-            >
-              Hủy
-            </Button>
-            <Button type="submit">Thêm</Button>
-          </div>
-        </form>
-      </Modal>
     </div>
   );
 }
