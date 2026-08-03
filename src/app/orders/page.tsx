@@ -14,6 +14,44 @@ import type { Database } from "@/types/database";
 type OrderRow = Database["public"]["Tables"]["orders"]["Row"];
 type OrderLineRow = Database["public"]["Tables"]["order_lines"]["Row"];
 
+// Sync bridge: push completed orders to Finance App
+// Uses a type assertion to avoid TS errors from the not-yet-deployed table.
+async function pushOrderToFinanceApp(
+  orderId: string,
+  lineId: string,
+  transactionType: string,
+  amount: number,
+  transactionDate: string,
+  merchantName: string | null,
+  note: string | null
+) {
+  try {
+    const supabase = createClient();
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id ?? '';
+
+    const { data, error } = await supabase
+      .from('bang_store_sync' as any)
+      .insert({
+        bang_store_order_id: orderId,
+        bang_store_line_id: lineId,
+        transaction_type: transactionType,
+        amount,
+        transaction_date: transactionDate,
+        merchant_name: merchantName,
+        note,
+        scope_id: null,
+        sync_status: 'pending',
+        synced_by: userId,
+        user_id: userId,
+      });
+    if (error) console.error('pushOrderToFinanceApp error:', error.message);
+    else console.log('pushOrderToFinanceApp success:', data);
+  } catch (err) {
+    console.error('pushOrderToFinanceApp exception:', err);
+  }
+}
+
 export default function OrdersPage() {
   const [search, setSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("all");
