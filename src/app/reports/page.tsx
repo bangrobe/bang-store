@@ -53,7 +53,7 @@ export default function ReportsPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <h1 className="text-2xl font-bold text-slate-900">
         Báo cáo
       </h1>
@@ -100,79 +100,81 @@ export default function ReportsPage() {
         />
       </div>
 
-      {/* Revenue Line Chart (CSS-based) */}
-      <Card className="p-6">
-        <h2 className="text-sm font-semibold text-slate-700 mb-4">
-          Doanh thu theo ngày
-        </h2>
-        <div className="relative h-48 flex items-end gap-1">
-          {/* Y-axis labels */}
-          <div className="absolute left-0 top-0 bottom-8 flex flex-col justify-between text-xs text-slate-400 tabular-nums">
-            <span>{formatVNDCompact(maxRevenue)}</span>
-            <span>{formatVNDCompact(maxRevenue / 2)}</span>
-            <span>0 ₫</span>
-          </div>
-          <div className="ml-8 flex-1 flex items-end gap-1 h-full">
-            {filteredRevenue.map((d) => {
-              const height = (d.revenue / maxRevenue) * 100;
-              return (
-                <div
-                  key={d.date}
-                  className="flex-1 flex flex-col items-center gap-1"
-                >
-                  <div
-                    className="w-full bg-indigo-500 rounded-t-md transition-all duration-300 hover:bg-indigo-600 relative group cursor-pointer"
-                    style={{ height: `${height}%`, minHeight: "4px" }}
-                  >
-                    {/* Tooltip */}
-                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                      {formatVND(d.revenue)} ({d.orders} đơn)
-                    </div>
-                  </div>
-                  <span className="text-xs text-slate-400">
-                    {new Date(d.date).getDate()}/{new Date(d.date).getMonth() + 1}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </Card>
-
-      {/* Top Selling Products */}
-      <Card className="p-6">
-        <h2 className="text-sm font-semibold text-slate-700 mb-4">
-          Sản phẩm bán chạy
-        </h2>
-        <div className="space-y-3">
-          {topProducts.map((product, index) => (
-            <div
-              key={product.id}
-              className="flex items-center gap-4"
-            >
-              <span className="w-6 text-center text-sm font-bold text-slate-400">
-                #{index + 1}
-              </span>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-slate-900">
-                  {product.name}
-                </p>
-                <p className="text-xs text-slate-400">
-                  {product.category}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-semibold text-slate-900 tabular-nums">
-                  {product.sold} đã bán
-                </p>
-                <p className="text-xs text-slate-400">
-                  {formatVND(product.priceOut)}
-                </p>
-              </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Revenue Line Chart */}
+        <Card className="p-6">
+          <h2 className="text-sm font-semibold text-slate-700 mb-4">
+            Doanh thu theo ngày
+          </h2>
+          <div className="relative h-48 flex items-end gap-1">
+            {/* Y-axis labels */}
+            <div className="absolute left-0 top-0 bottom-8 flex flex-col justify-between text-xs text-slate-400 tabular-nums">
+              <span>{formatVNDCompact(maxRevenue)}</span>
+              <span>{formatVNDCompact(maxRevenue / 2)}</span>
+              <span>0 ₫</span>
             </div>
-          ))}
-        </div>
-      </Card>
+            <div className="ml-8 flex-1 flex items-end gap-1 h-full">
+              {filteredRevenue.map((d) => {
+                const height = (d.revenue / maxRevenue) * 100;
+                return (
+                  <div
+                    key={d.date}
+                    className="flex-1 flex flex-col items-center gap-1"
+                  >
+                    <div
+                      className="w-full bg-indigo-500 rounded-t-md transition-all duration-300 hover:bg-indigo-600 relative group cursor-pointer"
+                      style={{ height: `${height}%`, minHeight: "4px" }}
+                    >
+                      {/* Tooltip */}
+                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                        {formatVND(d.revenue)} ({d.orders} đơn)
+                      </div>
+                    </div>
+                    <span className="text-xs text-slate-400">
+                      {new Date(d.date).getDate()}/{new Date(d.date).getMonth() + 1}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </Card>
+
+        {/* Top Selling Products */}
+        <Card className="p-6">
+          <h2 className="text-sm font-semibold text-slate-700 mb-4">
+            Sản phẩm bán chạy
+          </h2>
+          <div className="space-y-3">
+            {topProducts.map((product, index) => (
+              <div
+                key={product.id}
+                className="flex items-center gap-4"
+              >
+                <span className="w-6 text-center text-sm font-bold text-slate-400">
+                  #{index + 1}
+                </span>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-slate-900">
+                    {product.name}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {product.category}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-slate-900 tabular-nums">
+                    {product.sold} đã bán
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {formatVND(product.priceOut)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }

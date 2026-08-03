@@ -29,43 +29,109 @@ export default function SuppliersPage() {
         </Button>
       </div>
 
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="text-left px-4 py-3 font-medium text-slate-500">
-                  Tên
-                </th>
-                <th className="text-left px-4 py-3 font-medium text-slate-500">
-                  Điện thoại
-                </th>
-                <th className="text-left px-4 py-3 font-medium text-slate-500">
-                  Ghi chú
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {mockSuppliers.map((s) => (
-                <tr
-                  key={s.id}
-                  className="border-b border-slate-50 hover:bg-slate-50"
-                >
-                  <td className="px-4 py-3 font-medium text-slate-900">
-                    {s.name}
-                  </td>
-                  <td className="px-4 py-3 text-slate-600 tabular-nums">
-                    {s.phone}
-                  </td>
-                  <td className="px-4 py-3 text-slate-500">
-                    {s.note}
-                  </td>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Suppliers Table */}
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100">
+                  <th className="text-left px-4 py-3 font-medium text-slate-500">
+                    Tên
+                  </th>
+                  <th className="text-left px-4 py-3 font-medium text-slate-500">
+                    Điện thoại
+                  </th>
+                  <th className="text-left px-4 py-3 font-medium text-slate-500">
+                    Ghi chú
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+              </thead>
+              <tbody>
+                {mockSuppliers.map((s) => (
+                  <tr
+                    key={s.id}
+                    className="border-b border-slate-50 hover:bg-slate-50"
+                  >
+                    <td className="px-4 py-3 font-medium text-slate-900">
+                      {s.name}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600 tabular-nums">
+                      {s.phone}
+                    </td>
+                    <td className="px-4 py-3 text-slate-500">
+                      {s.note}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
+        {/* Supplier Form Card */}
+        <Card className="p-6">
+          <h2 className="text-sm font-semibold text-slate-700 mb-4">
+            Thêm nhà cung cấp mới
+          </h2>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSubmit();
+            }}
+            className="space-y-4"
+          >
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Tên nhà cung cấp *
+              </label>
+              <Input
+                value={form.name}
+                onChange={(e) =>
+                  setForm({ ...form, name: e.target.value })
+                }
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Điện thoại *
+              </label>
+              <Input
+                value={form.phone}
+                onChange={(e) =>
+                  setForm({ ...form, phone: e.target.value })
+                }
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Ghi chú
+              </label>
+              <Input
+                value={form.note}
+                onChange={(e) =>
+                  setForm({ ...form, note: e.target.value })
+                }
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setShowModal(false)}
+              >
+                Hủy
+              </Button>
+              <Button type="submit">Thêm</Button>
+            </div>
+          </form>
+        </Card>
+      </div>
 
       <Modal
         open={showModal}
