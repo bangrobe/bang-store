@@ -180,7 +180,19 @@ export default function POSPage() {
       if (orderError) throw new Error("Insert order: " + orderError.message);
 
       // 2) Insert order lines + push sync
-      for (const item of cart) {
+      // Theo yêu cầu của Boss: toàn bộ chiết khấu (discount) được trừ vào MỘT món hàng
+      // duy nhất — món CUỐI CÙNG trong giỏ hàng. Các món còn lại sync giá gốc.
+      // Tổng các lineNet phải bằng số tiền khách thực sự trả (finalTotal).
+      const finalTotal = paidAmount > 0 ? paidAmount : total;
+      const discountTotal = subtotal - finalTotal; // = discountAmount + (paidAmount - total) nếu override
+
+      for (let i = 0; i < cart.length; i++) {
+        const item = cart[i];
+        const isLast = i === cart.length - 1;
+        const lineBase = Number(item.product.price_out) * item.qty;
+        // Trừ toàn bộ chiết khấu + override vào món cuối
+        const lineNet = isLast ? (lineBase - discountTotal) : lineBase;
+
         const { data: lineData, error: lineError } = await supabase
           .from("order_lines")
           .insert({
@@ -189,21 +201,22 @@ export default function POSPage() {
             product_name: item.product.name,
             qty: item.qty,
             unit_price: Number(item.product.price_out),
-            line_total: Number(item.product.price_out) * item.qty,
+            line_total: lineBase, // gross price for POS reporting
           })
           .select("id")
           .single();
         if (lineError) throw new Error("Insert order line: " + lineError.message);
 
-        // 3) Push sync record for each line — use product.category as category_name
-        //    Set account_name based on payment method (transfer → BIDV HKD)
+        // 3) Push sync record for each line — sync SỐ TIỀN THỰC TẾ (lineNet)
+        //    account_name chỉ set khi transfer → trigger resolve về BIDV HKD;
+        //    cash (account_name=null) → trigger resolve về Tiền cửa hàng.
         await (supabase as any)
           .from("bang_store_sync")
           .insert({
             bang_store_order_id: orderData.id,
             bang_store_line_id: lineData.id,
             transaction_type: "income",
-            amount: Number(item.product.price_out) * item.qty,
+            amount: lineNet, // ✅ sync net, không phải gross
             transaction_date: new Date().toISOString().slice(0, 10),
             merchant_name: null,
             note: `${item.product.name} x ${item.qty}`,
