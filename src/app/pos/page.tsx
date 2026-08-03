@@ -14,6 +14,7 @@ import type { Database } from "@/types/database";
 import { useRouter } from "next/navigation";
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];
+type CustomerRow = Database["public"]["Tables"]["customers"]["Row"];
 type Category = string;
 
 const CATEGORIES = [
@@ -41,15 +42,23 @@ export default function POSPage() {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Customer selection
+  const [customers, setCustomers] = useState<CustomerRow[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [customerForm, setCustomerForm] = useState({ name: "", phone: "", note: "" });
+
   useEffect(() => {
     (async () => {
       const supabase = createClient();
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .order("name");
-      if (error) console.error("fetch products:", error);
-      setProducts((data as ProductRow[]) || []);
+      const [prodRes, custRes] = await Promise.all([
+        supabase.from("products").select("*").order("name"),
+        supabase.from("customers").select("*").order("name"),
+      ]);
+      if (prodRes.error) console.error("fetch products:", prodRes.error);
+      if (custRes.error) console.error("fetch customers:", custRes.error);
+      setProducts((prodRes.data as ProductRow[]) || []);
+      setCustomers((custRes.data as CustomerRow[]) || []);
       setLoading(false);
     })();
   }, []);
@@ -109,6 +118,36 @@ export default function POSPage() {
     );
   }, []);
 
+  // Resolve account_name for sync based on payment method
+  const resolveAccountName = (method: string): string | null => {
+    if (method === "transfer") return "BIDV HKD";
+    return null;
+  };
+
+  const createCustomerQuick = async () => {
+    if (!customerForm.name.trim() || !customerForm.phone.trim()) return;
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("customers")
+      .insert({
+        name: customerForm.name,
+        phone: customerForm.phone,
+        note: customerForm.note || null,
+      })
+      .select("id, name, phone, note, created_at")
+      .single();
+    if (error) {
+      console.error("create customer:", error);
+      alert("Lỗi tạo khách hàng: " + error.message);
+      return;
+    }
+    const newCustomer = data as CustomerRow;
+    setCustomers((prev) => [...prev, newCustomer].sort((a, b) => a.name.localeCompare(b.name)));
+    setSelectedCustomerId(newCustomer.id);
+    setShowCustomerModal(false);
+    setCustomerForm({ name: "", phone: "", note: "" });
+  };
+
   const handleCheckout = useCallback(async () => {
     if (cart.length === 0) return;
     const finalTotal = paidAmount > 0 ? paidAmount : total;
@@ -122,25 +161,28 @@ export default function POSPage() {
     try {
       const supabase = createClient();
       const { data: userData } = await supabase.auth.getUser();
-      const userId = userData.user?.id ?? '';
+      const userId = userData.user?.id ?? "";
 
-      // 1) Insert order
+      const accountName = resolveAccountName(paymentMethod);
+
+      // 1) Insert order (with customer_id if selected)
       const { data: orderData, error: orderError } = await supabase
-        .from('orders')
+        .from("orders")
         .insert({
           total,
           actual_total: paidAmount > 0 ? paidAmount : null,
           payment_method: paymentMethod as any,
           note: note || null,
+          customer_id: selectedCustomerId || null,
         })
-        .select('id')
+        .select("id")
         .single();
-      if (orderError) throw new Error('Insert order: ' + orderError.message);
+      if (orderError) throw new Error("Insert order: " + orderError.message);
 
       // 2) Insert order lines + push sync
       for (const item of cart) {
         const { data: lineData, error: lineError } = await supabase
-          .from('order_lines')
+          .from("order_lines")
           .insert({
             order_id: orderData.id,
             product_id: item.product.id,
@@ -149,48 +191,59 @@ export default function POSPage() {
             unit_price: Number(item.product.price_out),
             line_total: Number(item.product.price_out) * item.qty,
           })
-          .select('id')
+          .select("id")
           .single();
-        if (lineError) throw new Error('Insert order line: ' + lineError.message);
+        if (lineError) throw new Error("Insert order line: " + lineError.message);
 
         // 3) Push sync record for each line — use product.category as category_name
-        await supabase
-          .from('bang_store_sync' as any)
+        //    Set account_name based on payment method (transfer → BIDV HKD)
+        await (supabase as any)
+          .from("bang_store_sync")
           .insert({
             bang_store_order_id: orderData.id,
             bang_store_line_id: lineData.id,
-            transaction_type: 'income',
+            transaction_type: "income",
             amount: Number(item.product.price_out) * item.qty,
             transaction_date: new Date().toISOString().slice(0, 10),
             merchant_name: null,
             note: `${item.product.name} x ${item.qty}`,
             category_name: item.product.category,
             scope_id: null,
-            sync_status: 'pending',
+            sync_status: "pending",
             synced_by: userId,
             user_id: userId,
+            account_name: accountName,
           });
       }
 
       // 4) Also log inventory changes
       for (const item of cart) {
         await supabase
-          .from('inventory_log')
+          .from("inventory_log")
           .insert({
             product_id: item.product.id,
             change_qty: -item.qty,
-            reason: 'sale',
+            reason: "sale",
             reference_id: orderData.id,
-            note: `Đơn #ORD-...`,
+            note: `Bán hàng #ORD-...`,
           });
       }
 
       setShowSuccess(true);
+      // Reset form for next sale
+      setCart([]);
+      setDiscount(0);
+      setNote("");
+      setCashInput("");
+      setPaidAmount(0);
+      setChangeAmount(0);
+      setPaymentMethod("cash");
+      setSelectedCustomerId("");
     } catch (err: any) {
-      console.error('Checkout error:', err.message);
-      alert('Lỗi thanh toán: ' + err.message);
+      console.error("Checkout error:", err.message);
+      alert("Lỗi thanh toán: " + err.message);
     }
-  }, [cart, paymentMethod, cashInput, total, paidAmount, note]);
+  }, [cart, paymentMethod, cashInput, total, paidAmount, note, selectedCustomerId]);
 
   const handleNewSale = useCallback(() => {
     setCart([]);
@@ -200,6 +253,8 @@ export default function POSPage() {
     setPaidAmount(0);
     setChangeAmount(0);
     setShowSuccess(false);
+    setSelectedCustomerId("");
+    setCustomerForm({ name: "", phone: "", note: "" });
   }, []);
 
   if (loading) {
@@ -287,7 +342,7 @@ export default function POSPage() {
               </div>
             ) : (
               <div className="flex flex-col flex-1 min-h-0">
-                {/* Cart Items — scrollable list with constrained height */}
+                {/* Cart Items */}
                 <div className="flex-1 overflow-y-auto space-y-2 -mx-1 px-1 min-h-0" style={{ minHeight: "200px", maxHeight: "350px" }}>
                   {cart.map((item) => (
                     <div
@@ -339,6 +394,41 @@ export default function POSPage() {
                       </span>
                     </div>
                   ))}
+                </div>
+
+                {/* Customer Selection */}
+                <div className="mt-3 pt-3 border-t border-slate-100 shrink-0">
+                  <label className="text-xs text-slate-500 mb-1 block">
+                    Khách hàng
+                  </label>
+                  <div className="flex gap-2">
+                    <Select
+                      value={selectedCustomerId}
+                      onChange={(e) => setSelectedCustomerId(e.target.value)}
+                      className="flex-1"
+                    >
+                      <option value="">Chọn khách hàng</option>
+                      {customers.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({c.phone})
+                        </option>
+                      ))}
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setShowCustomerModal(true)}
+                      title="Thêm khách hàng mới"
+                    >
+                      +
+                    </Button>
+                  </div>
+                  {selectedCustomerId && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      {customers.find((c) => c.id === selectedCustomerId)?.name}
+                    </p>
+                  )}
                 </div>
 
                 {/* Discount */}
@@ -497,42 +587,82 @@ export default function POSPage() {
         </div>
       </div>
 
+      {/* Add Customer Modal — inline / quick-create */}
+      <Modal
+        open={showCustomerModal}
+        onClose={() => setShowCustomerModal(false)}
+        title="Thêm khách hàng mới"
+        size="sm"
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            createCustomerQuick();
+          }}
+          className="space-y-4"
+        >
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Tên khách hàng *
+            </label>
+            <Input
+              value={customerForm.name}
+              onChange={(e) =>
+                setCustomerForm({ ...customerForm, name: e.target.value })
+              }
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Số điện thoại *
+            </label>
+            <Input
+              value={customerForm.phone}
+              onChange={(e) =>
+                setCustomerForm({ ...customerForm, phone: e.target.value })
+              }
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Ghi chú
+            </label>
+            <Input
+              value={customerForm.note}
+              onChange={(e) =>
+                setCustomerForm({ ...customerForm, note: e.target.value })
+              }
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setShowCustomerModal(false)}
+            >
+              Hủy
+            </Button>
+            <Button type="submit">Thêm</Button>
+          </div>
+        </form>
+      </Modal>
+
       {/* Success Modal */}
       <Modal
         open={showSuccess}
-        onClose={() => {
-          setShowSuccess(false);
-          handleNewSale();
-        }}
-        title="Thanh toán thành công"
+        onClose={() => setShowSuccess(false)}
+        title="Thanh toán thành công!"
         size="sm"
       >
         <div className="text-center py-4">
-          <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center text-3xl mx-auto mb-4">
-            ✅
-          </div>
-          <h3 className="text-lg font-semibold text-slate-900 mb-2">
-            Đã thanh toán
-          </h3>
-          <p className="text-sm text-slate-500 mb-1">
-            Tổng: {formatVND(paidAmount > 0 ? paidAmount : total)}
+          <div className="text-4xl mb-4">✅</div>
+          <p className="text-sm text-slate-600 mb-4">
+            Đơn hàng đã được lưu và đồng bộ sang Personal Finance App.
           </p>
-          {paymentMethod === "cash" && changeAmount > 0 && (
-            <p className="text-sm text-emerald-600 font-medium">
-              Tiền thừa: {formatVND(changeAmount)}
-            </p>
-          )}
-          <p className="text-xs text-slate-400 mt-4">
-            Mã đơn: {`ORD-${Date.now().toString().slice(-6)}`}
-          </p>
-          <Button
-            className="mt-6"
-            onClick={() => {
-              setShowSuccess(false);
-              handleNewSale();
-            }}
-          >
-            Đơn hàng tiếp theo
+          <Button onClick={() => { setShowSuccess(false); handleNewSale(); }}>
+            Bán hàng mới
           </Button>
         </div>
       </Modal>

@@ -399,6 +399,75 @@ export type Database = {
           },
         ];
       };
+      bang_store_sync: {
+        Row: {
+          id: string;
+          bang_store_order_id: string;
+          bang_store_line_id: string;
+          transaction_type: string;
+          amount: number;
+          transaction_date: string;
+          category_id: string | null;
+          category_name: string | null;
+          account_id: string | null;
+          account_name: string | null;
+          scope_id: string | null;
+          merchant_name: string | null;
+          note: string | null;
+          sync_status: "pending" | "synced" | "failed" | "skipped";
+          synced_at: string | null;
+          sync_error: string | null;
+          synced_by: string | null;
+          user_id: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          bang_store_order_id: string;
+          bang_store_line_id: string;
+          transaction_type: string;
+          amount: number;
+          transaction_date: string;
+          category_id?: string | null;
+          category_name?: string | null;
+          account_id?: string | null;
+          account_name?: string | null;
+          scope_id?: string | null;
+          merchant_name?: string | null;
+          note?: string | null;
+          sync_status?: "pending" | "synced" | "failed" | "skipped";
+          synced_at?: string | null;
+          sync_error?: string | null;
+          synced_by?: string | null;
+          user_id: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          bang_store_order_id?: string;
+          bang_store_line_id?: string;
+          transaction_type?: string;
+          amount?: number;
+          transaction_date?: string;
+          category_id?: string | null;
+          category_name?: string | null;
+          account_id?: string | null;
+          account_name?: string | null;
+          scope_id?: string | null;
+          merchant_name?: string | null;
+          note?: string | null;
+          sync_status?: "pending" | "synced" | "failed" | "skipped";
+          synced_at?: string | null;
+          sync_error?: string | null;
+          synced_by?: string | null;
+          user_id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       inventory_log: {
         Row: {
           id: string;
