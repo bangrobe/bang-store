@@ -109,7 +109,7 @@ export default function POSPage() {
     );
   }, []);
 
-  const handleCheckout = useCallback(() => {
+  const handleCheckout = useCallback(async () => {
     if (cart.length === 0) return;
     const finalTotal = paidAmount > 0 ? paidAmount : total;
     if (paymentMethod === "cash") {
@@ -117,8 +117,79 @@ export default function POSPage() {
       if (amount < finalTotal) return;
       setChangeAmount(amount - finalTotal);
     }
-    setShowSuccess(true);
-  }, [cart, paymentMethod, cashInput, total, paidAmount]);
+
+    // Save order to database + push sync to Finance App
+    try {
+      const supabase = createClient();
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id ?? '';
+
+      // 1) Insert order
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          total,
+          actual_total: paidAmount > 0 ? paidAmount : null,
+          payment_method: paymentMethod as any,
+          note: note || null,
+        })
+        .select('id')
+        .single();
+      if (orderError) throw new Error('Insert order: ' + orderError.message);
+
+      // 2) Insert order lines + push sync
+      for (const item of cart) {
+        const { data: lineData, error: lineError } = await supabase
+          .from('order_lines')
+          .insert({
+            order_id: orderData.id,
+            product_id: item.product.id,
+            product_name: item.product.name,
+            qty: item.qty,
+            unit_price: Number(item.product.price_out),
+            line_total: Number(item.product.price_out) * item.qty,
+          })
+          .select('id')
+          .single();
+        if (lineError) throw new Error('Insert order line: ' + lineError.message);
+
+        // 3) Push sync record for each line
+        await supabase
+          .from('bang_store_sync' as any)
+          .insert({
+            bang_store_order_id: orderData.id,
+            bang_store_line_id: lineData.id,
+            transaction_type: 'income',
+            amount: Number(item.product.price_out) * item.qty,
+            transaction_date: new Date().toISOString().slice(0, 10),
+            merchant_name: null,
+            note: `${item.product.name} x ${item.qty}`,
+            scope_id: null,
+            sync_status: 'pending',
+            synced_by: userId,
+            user_id: userId,
+          });
+      }
+
+      // 4) Also log inventory changes
+      for (const item of cart) {
+        await supabase
+          .from('inventory_log')
+          .insert({
+            product_id: item.product.id,
+            change_qty: -item.qty,
+            reason: 'sale',
+            reference_id: orderData.id,
+            note: `Đơn #ORD-...`,
+          });
+      }
+
+      setShowSuccess(true);
+    } catch (err: any) {
+      console.error('Checkout error:', err.message);
+      alert('Lỗi thanh toán: ' + err.message);
+    }
+  }, [cart, paymentMethod, cashInput, total, paidAmount, note]);
 
   const handleNewSale = useCallback(() => {
     setCart([]);

@@ -266,6 +266,30 @@ export default function OrdersPage() {
       >
         {selectedOrder && (
           <div className="space-y-4">
+            {/* Manual Sync Button */}
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={async () => {
+                  for (const line of selectedOrder.lines) {
+                    await pushOrderToFinanceApp(
+                      selectedOrder.id,
+                      line.id,
+                      'income',
+                      Number(line.line_total),
+                      selectedOrder.order_time?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+                      null,
+                      `${line.product_name} x ${line.qty}`
+                    );
+                  }
+                  alert('Đã đồng bộ đơn hàng!');
+                }}
+              >
+                🔄 Đồng bộ
+              </Button>
+            </div>
+
             {/* Order Info */}
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
