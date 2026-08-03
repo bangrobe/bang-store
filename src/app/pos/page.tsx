@@ -153,7 +153,7 @@ export default function POSPage() {
           .single();
         if (lineError) throw new Error('Insert order line: ' + lineError.message);
 
-        // 3) Push sync record for each line
+        // 3) Push sync record for each line — use product.category as category_name
         await supabase
           .from('bang_store_sync' as any)
           .insert({
@@ -164,6 +164,7 @@ export default function POSPage() {
             transaction_date: new Date().toISOString().slice(0, 10),
             merchant_name: null,
             note: `${item.product.name} x ${item.qty}`,
+            category_name: item.product.category,
             scope_id: null,
             sync_status: 'pending',
             synced_by: userId,

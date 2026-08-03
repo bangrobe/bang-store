@@ -23,7 +23,8 @@ async function pushOrderToFinanceApp(
   amount: number,
   transactionDate: string,
   merchantName: string | null,
-  note: string | null
+  note: string | null,
+  categoryName?: string | null
 ) {
   try {
     const supabase = createClient();
@@ -40,6 +41,7 @@ async function pushOrderToFinanceApp(
         transaction_date: transactionDate,
         merchant_name: merchantName,
         note,
+        category_name: categoryName || null,
         scope_id: null,
         sync_status: 'pending',
         synced_by: userId,
@@ -111,7 +113,16 @@ export default function OrdersPage() {
       .select("*")
       .eq("order_id", order.id)
       .order("id");
-    setSelectedOrder({ ...order, lines: (lines as OrderLineRow[]) || [] });
+    // Attach product category to each line for accurate sync mapping
+    const lineRows = (lines as OrderLineRow[]) || [];
+    const products = lineRows.length
+      ? await supabase.from("products").select("id, category").in("id", lineRows.map((l) => l.product_id))
+      : { data: [] };
+    const catMap = new Map<string, string | null>(
+      ((products.data as { id: string; category: string }[]) || []).map((p) => [p.id, p.category])
+    );
+    const linesWithCategory = lineRows.map((l) => ({ ...l, category: catMap.get(l.product_id) ?? null }));
+    setSelectedOrder({ ...order, lines: linesWithCategory });
     setShowDetail(true);
   };
 
@@ -280,7 +291,8 @@ export default function OrdersPage() {
                       Number(line.line_total),
                       selectedOrder.order_time?.slice(0, 10) || new Date().toISOString().slice(0, 10),
                       null,
-                      `${line.product_name} x ${line.qty}`
+                      `${line.product_name} x ${line.qty}`,
+                      (line as any).category || null
                     );
                   }
                   alert('Đã đồng bộ đơn hàng!');
