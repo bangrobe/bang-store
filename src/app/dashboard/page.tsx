@@ -30,12 +30,19 @@ type OrderRow = {
   payment_method: string;
 };
 
+// Kết quả fetch order_lines join orders!inner (filter theo ngày)
+type TodaySoldRow = {
+  qty: number;
+  orders: { order_time: string };
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const [date] = useState(new Date().toISOString().split("T")[0]);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [recentOrders, setRecentOrders] = useState<OrderRow[]>([]);
+  const [todaySold, setTodaySold] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -49,17 +56,32 @@ export default function DashboardPage() {
         return;
       }
 
-      const [prodRes, orderRes] = await Promise.all([
+      const dayStart = new Date();
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date();
+      dayEnd.setHours(23, 59, 59, 999);
+
+      const [prodRes, orderRes, soldRes] = await Promise.all([
         supabase.from("products").select("*").order("name").limit(100),
         supabase
           .from("orders")
           .select("id, order_number, order_time, total, payment_method")
           .order("order_number", { ascending: false })
           .limit(8),
+        supabase
+          .from("order_lines")
+          .select("qty, orders!inner(order_time)")
+          .gte("orders.order_time", dayStart.toISOString())
+          .lte("orders.order_time", dayEnd.toISOString()),
       ]);
 
       if (prodRes.error) console.error("fetch products:", prodRes.error);
       if (orderRes.error) console.error("fetch orders:", orderRes.error);
+      if (soldRes.error) console.error("fetch order_lines:", soldRes.error);
+
+      // "Sản phẩm đã bán hôm nay" = SUM(qty) của các order trong hôm nay
+      const lines = (soldRes.data as TodaySoldRow[]) || [];
+      setTodaySold(lines.reduce((sum, l) => sum + Number(l.qty || 0), 0));
 
       setProducts((prodRes.data as Product[]) || []);
       setOrders((orderRes.data as OrderRow[]) || []);
@@ -79,8 +101,6 @@ export default function DashboardPage() {
     () => orders.filter((o) => o.order_time?.startsWith(date)).length,
     [orders, date]
   );
-
-  const todaySold = useMemo(() => 0, []);
 
   const alerts: StockAlert[] = useMemo(
     () =>
