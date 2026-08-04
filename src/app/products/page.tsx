@@ -14,6 +14,11 @@ import { formatVND } from "@/lib/utils";
 import { CATEGORIES } from "@/lib/mock";
 import { createClient } from "@/lib/supabase";
 
+const MAX_IMAGES = 5;
+const BUCKET = "products-images";
+
+type ProductImage = { url: string; alt: string };
+
 type Product = {
   id: string;
   name: string;
@@ -23,7 +28,7 @@ type Product = {
   brand: string;
   compatible_devices: string[];
   color: string | null;
-  images: { url: string; alt: string }[] | any[] | null;
+  images: ProductImage[] | any[] | null;
   date_import: string;
   price_in: number;
   price_out: number;
@@ -100,6 +105,48 @@ export default function ProductsPage() {
   }, [products, category, search]);
 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  // Upload a single image file to Supabase Storage and return its public URL
+  const uploadImage = async (file: File): Promise<ProductImage | null> => {
+    const supabase = createClient();
+    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, file, { cacheControl: "3600", upsert: false });
+    if (error) {
+      console.error("upload image:", error);
+      alert("Không thể upload ảnh: " + error.message);
+      return null;
+    }
+    const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
+    return { url: pub.publicUrl, alt: file.name };
+  };
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const current = (form.images as ProductImage[]) || [];
+    if (current.length + files.length > MAX_IMAGES) {
+      alert(`Chỉ được thêm tối đa ${MAX_IMAGES} ảnh`);
+      return;
+    }
+    setUploading(true);
+    const uploaded: ProductImage[] = [];
+    for (const f of files) {
+      const img = await uploadImage(f);
+      if (img) uploaded.push(img);
+    }
+    setForm({ ...form, images: [...current, ...uploaded] });
+    setUploading(false);
+    e.target.value = "";
+  };
+
+  const removeImage = (idx: number) => {
+    const current = (form.images as ProductImage[]) || [];
+    setForm({ ...form, images: current.filter((_, i) => i !== idx) });
+  };
 
   const handleSubmit = async () => {
     const supabase = createClient();
@@ -326,6 +373,54 @@ export default function ProductsPage() {
               <label className="block text-sm font-medium text-slate-700 mb-1">Ghi chú</label>
               <Input value={form.note || ""} onChange={(e) => setForm({ ...form, note: e.target.value })} />
             </div>
+
+            {/* Product Images */}
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Ảnh sản phẩm ({((form.images as ProductImage[]) || []).length}/{MAX_IMAGES})
+              </label>
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+                {((form.images as ProductImage[]) || []).map((img, i) => (
+                  <div key={i} className="relative group">
+                    <img
+                      src={img.url}
+                      alt={img.alt}
+                      className="w-full h-20 object-cover rounded-lg border border-slate-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(i)}
+                      className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white text-xs flex items-center justify-center shadow hover:bg-red-600"
+                      title="Xoá ảnh"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                {((form.images as ProductImage[]) || []).length < MAX_IMAGES && (
+                  <label className="w-full h-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors text-slate-400">
+                    {uploading ? (
+                      <span className="text-xs">Đang tải...</span>
+                    ) : (
+                      <>
+                        <span className="text-2xl leading-none">+</span>
+                        <span className="text-xs mt-1">Thêm ảnh</span>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/gif"
+                      multiple
+                      className="hidden"
+                      disabled={uploading}
+                      onChange={handleImageSelect}
+                    />
+                  </label>
+                )}
+              </div>
+              <p className="text-xs text-slate-400 mt-1">PNG/JPEG/WebP/GIF, tối đa 5MB mỗi ảnh.</p>
+            </div>
+
             <div className="sm:col-span-2">
               <label className="flex items-center gap-3 cursor-pointer">
                 <input type="checkbox" checked={form.vat} onChange={(e) => setForm({ ...form, vat: e.target.checked })} className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
