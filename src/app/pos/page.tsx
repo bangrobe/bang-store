@@ -25,6 +25,7 @@ const CATEGORY_ICON: Record<string, string> = {
   "Tai nghe": "🎧",
   "Kính cường lực": "🛡️",
   "Pin dự phòng": "🔋",
+  "Khác": "📦",
 };
 
 const getProductImageUrl = (images: unknown): string | null => {
@@ -50,6 +51,7 @@ const CATEGORIES = [
   "Tai nghe",
   "Kính cường lực",
   "Pin dự phòng",
+  "Khác",
 ];
 
 export default function POSPage() {

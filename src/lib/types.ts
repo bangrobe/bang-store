@@ -5,7 +5,8 @@ export type Category =
   | "Củ sạc"
   | "Tai nghe"
   | "Kính cường lực"
-  | "Pin dự phòng";
+  | "Pin dự phòng"
+  | "Khác";
 
 export type PaymentMethod = "cash" | "transfer" | "both";
 export type ProductStatus = "active" | "discontinued";

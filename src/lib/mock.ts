@@ -30,6 +30,7 @@ export const CATEGORIES: Category[] = [
   "Tai nghe",
   "Kính cường lực",
   "Pin dự phòng",
+  "Khác",
 ];
 
 const IMG_PLACEHOLDER =
