@@ -37,6 +37,7 @@ type Product = {
   status: string;
   vat: boolean;
   note: string | null;
+  created_at?: string;
 };
 
 type Category = string;
@@ -45,6 +46,7 @@ export default function ProductsPage() {
   const router = useRouter();
   const [category, setCategory] = useState<Category>("Tất cả");
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<"new" | "az">("new");
   const [showModal, setShowModal] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,6 +103,14 @@ export default function ProductsPage() {
           p.brand.toLowerCase().includes(q)
       );
     }
+    result = [...result].sort((a, b) => {
+      if (sortBy === "new") {
+        const da = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const db = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return db - da;
+      }
+      return a.name.localeCompare(b.name, "vi");
+    });
     return result;
   }, [products, category, search]);
 
@@ -210,7 +220,7 @@ export default function ProductsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="flex gap-2 overflow-x-auto pb-2">
           {CATEGORIES.map((cat) => (
             <Chip
@@ -222,12 +232,22 @@ export default function ProductsPage() {
             </Chip>
           ))}
         </div>
-        <Input
-          placeholder="Tìm kiếm tên, SKU, thương hiệu..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="sm:w-72"
-        />
+        <div className="flex items-center gap-3 sm:ml-auto">
+          <Select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as "new" | "az")}
+            className="w-44 shrink-0"
+          >
+            <option value="new">Mới nhất</option>
+            <option value="az">Tên A → Z</option>
+          </Select>
+          <Input
+            placeholder="Tìm kiếm tên, SKU, thương hiệu..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="sm:w-72"
+          />
+        </div>
       </div>
 
       {/* Table */}
