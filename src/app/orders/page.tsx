@@ -313,8 +313,26 @@ export default function OrdersPage() {
                         {order.note || "—"}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="sm" onClick={() => loadOrderDetail(order)}>
                           👁 Xem
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (!confirm(`Xoá đơn #ORD-${String(order.order_number).padStart(4, "0")}?`)) return;
+                            const supabase = createClient();
+                            const { error } = await supabase.from("orders").delete().eq("id", order.id);
+                            if (error) alert("Lỗi: " + error.message);
+                            else {
+                              setOrders(orders.filter((o) => o.id !== order.id));
+                              alert("Đã xoá đơn hàng!");
+                            }
+                          }}
+                        >
+                          🗑 Xoá
                         </Button>
                       </td>
                     </tr>
@@ -348,12 +366,23 @@ export default function OrdersPage() {
                 variant="secondary"
                 size="sm"
                 onClick={async () => {
-                  for (const line of selectedOrder.lines) {
+                  const subtotal = Number(selectedOrder.total);
+                  const finalTotal = selectedOrder.actual_total
+                    ? Number(selectedOrder.actual_total)
+                    : subtotal;
+                  const discountTotal = subtotal - finalTotal;
+
+                  for (let i = 0; i < selectedOrder.lines.length; i++) {
+                    const line = selectedOrder.lines[i];
+                    const isLast = i === selectedOrder.lines.length - 1;
+                    const lineBase = Number(line.line_total);
+                    // Trừ toàn bộ discount + override vào món cuối (match POS logic)
+                    const lineNet = isLast ? lineBase - discountTotal : lineBase;
                     await pushOrderToFinanceApp(
                       selectedOrder.id,
                       line.id,
                       'income',
-                      Number(line.line_total),
+                      lineNet,                 // ✅ net amount sau discount
                       selectedOrder.order_time?.slice(0, 10) || new Date().toISOString().slice(0, 10),
                       null,
                       `${line.product_name} x ${line.qty}`,
