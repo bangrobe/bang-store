@@ -17,6 +17,31 @@ type ProductRow = Database["public"]["Tables"]["products"]["Row"];
 type CustomerRow = Database["public"]["Tables"]["customers"]["Row"];
 type Category = string;
 
+// Map category -> emoji icon (fallback when product has no image)
+const CATEGORY_ICON: Record<string, string> = {
+  "Ốp lưng": "📱",
+  "Cáp": "🔌",
+  "Củ sạc": "🔋",
+  "Tai nghe": "🎧",
+  "Kính cường lực": "🛡️",
+  "Pin dự phòng": "🔋",
+};
+
+const getProductImageUrl = (images: unknown): string | null => {
+  if (Array.isArray(images) && images.length > 0) {
+    const first = images[0] as { url?: string } | null;
+    if (first && typeof first.url === "string" && first.url) {
+      // Ignore placeholder seed data — treat as no image
+      if (first.url.includes("placehold.co")) return null;
+      return first.url;
+    }
+  }
+  return null;
+};
+
+const getCategoryIcon = (category: string): string =>
+  CATEGORY_ICON[category] || "📦";
+
 const CATEGORIES = [
   "Tất cả",
   "Ốp lưng",
@@ -314,9 +339,23 @@ export default function POSPage() {
                 onClick={() => handleAddToCart(product)}
               >
                 <div className="flex items-start justify-between mb-2">
-                  <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 text-lg">
-                    📱
-                  </div>
+                  {(() => {
+                    const imgUrl = getProductImageUrl(product.images);
+                    if (imgUrl) {
+                      return (
+                        <img
+                          src={imgUrl}
+                          alt={product.name}
+                          className="w-12 h-12 rounded-lg object-cover border border-slate-100"
+                        />
+                      );
+                    }
+                    return (
+                      <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 text-lg">
+                        {getCategoryIcon(product.category)}
+                      </div>
+                    );
+                  })()}
                   <Badge
                     variant={
                       product.stock_qty < product.min_stock
@@ -362,8 +401,20 @@ export default function POSPage() {
                       key={item.product.id}
                       className="flex items-center gap-3 p-2 rounded-lg bg-slate-50"
                     >
-                      <div className="w-8 h-8 rounded bg-indigo-100 flex items-center justify-center text-indigo-600 text-sm">
-                        📱
+                      <div className="w-8 h-8 rounded bg-indigo-100 flex items-center justify-center text-indigo-600 text-sm overflow-hidden">
+                        {(() => {
+                          const imgUrl = getProductImageUrl(item.product.images);
+                          if (imgUrl) {
+                            return (
+                              <img
+                                src={imgUrl}
+                                alt={item.product.name}
+                                className="w-full h-full object-cover"
+                              />
+                            );
+                          }
+                          return <span>{getCategoryIcon(item.product.category)}</span>;
+                        })()}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium text-slate-900 truncate">
