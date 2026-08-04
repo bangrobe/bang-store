@@ -117,14 +117,58 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [uploading, setUploading] = useState(false);
 
+  // Compress + resize an image client-side using a canvas.
+  // Max dimension 1000px (keep aspect ratio), output JPEG q=0.8.
+  const compressImage = (file: File, maxDim = 1000, quality = 0.8): Promise<File> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("read file failed"));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error("decode image failed"));
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            const scale = Math.min(maxDim / width, maxDim / height);
+            width = Math.round(width * scale);
+            height = Math.round(height * scale);
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return reject(new Error("no canvas context"));
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) return reject(new Error("compress failed"));
+              const out = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
+                type: "image/jpeg",
+              });
+              resolve(out);
+            },
+            "image/jpeg",
+            quality
+          );
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+
   // Upload a single image file to Supabase Storage and return its public URL
   const uploadImage = async (file: File): Promise<ProductImage | null> => {
     const supabase = createClient();
-    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-    const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    let toUpload = file;
+    try {
+      toUpload = await compressImage(file);
+    } catch (err) {
+      console.warn("image compress skipped, upload original:", err);
+    }
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
     const { error } = await supabase.storage
       .from(BUCKET)
-      .upload(path, file, { cacheControl: "3600", upsert: false });
+      .upload(path, toUpload, { cacheControl: "3600", upsert: false, contentType: "image/jpeg" });
     if (error) {
       console.error("upload image:", error);
       alert("Không thể upload ảnh: " + error.message);
