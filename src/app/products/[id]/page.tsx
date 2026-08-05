@@ -23,7 +23,7 @@ export default function ProductDetailPage({
       const supabase = createClient();
       const { data, error } = await supabase
         .from("products")
-        .select("*")
+        .select("*, suppliers(name)")
         .eq("id", id)
         .single();
       if (error) {
@@ -110,6 +110,10 @@ export default function ProductDetailPage({
               <p>{product.brand}</p>
             </div>
             <div>
+              <p className="text-slate-500">Nhà cung cấp</p>
+              <p>{product.suppliers?.name || "—"}</p>
+            </div>
+            <div>
               <p className="text-slate-500">Màu sắc</p>
               <p>{product.color || "—"}</p>
             </div>
@@ -119,12 +123,12 @@ export default function ProductDetailPage({
             </div>
             <div>
               <p className="text-slate-500">Giá nhập</p>
-              <p className="font-medium tabular-nums">{formatVND(product.price_in)}</p>
+              <p className="font-medium tabular-nums">{formatVND(product.price_in, { unit: false })}</p>
             </div>
             <div>
               <p className="text-slate-500">Giá bán</p>
               <p className="font-medium tabular-nums text-indigo-600">
-                {formatVND(product.price_out)}
+                {formatVND(product.price_out, { unit: false })}
               </p>
             </div>
             <div>

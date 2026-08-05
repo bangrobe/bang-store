@@ -5,8 +5,10 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatVND(amount: number): string {
-  return new Intl.NumberFormat("vi-VN").format(amount) + " ₫";
+export function formatVND(amount: number, opts?: { unit?: boolean }): string {
+  const showUnit = opts?.unit ?? true;
+  const num = new Intl.NumberFormat("vi-VN").format(amount);
+  return showUnit ? num + " ₫" : num;
 }
 
 export function formatVNDCompact(amount: number): string {

@@ -37,6 +37,7 @@ type Product = {
   status: string;
   vat: boolean;
   note: string | null;
+  supplier_id: string | null;
   created_at?: string;
 };
 
@@ -50,6 +51,7 @@ export default function ProductsPage() {
   const [showModal, setShowModal] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
   const [form, setForm] = useState<Partial<Product>>({
     name: "",
     category: "Ốp lưng",
@@ -67,6 +69,7 @@ export default function ProductsPage() {
     status: "active",
     vat: false,
     note: "",
+    supplier_id: null,
   });
 
   useEffect(() => {
@@ -85,6 +88,11 @@ export default function ProductsPage() {
         .order("name");
       if (error) console.error("fetch products:", error);
       setProducts((data as Product[]) || []);
+      const { data: sup } = await supabase
+        .from("suppliers")
+        .select("id, name")
+        .order("name");
+      setSuppliers((sup as { id: string; name: string }[]) || []);
       setLoading(false);
     })();
   }, [router]);
@@ -221,6 +229,7 @@ export default function ProductsPage() {
       status: form.status || "active",
       vat: form.vat || false,
       note: form.note || null,
+      supplier_id: form.supplier_id || null,
     };
     const { error } = editingProduct
       ? await supabase.from("products").update(payload as never).eq("id", editingProduct.id)
@@ -260,7 +269,7 @@ export default function ProductsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900">Sản phẩm</h1>
-        <Button onClick={() => { setEditingProduct(null); setForm({ name: "", category: "Ốp lưng", sku: "", barcode: "", brand: "", compatible_devices: [], color: "", images: [], date_import: new Date().toISOString().split("T")[0], price_in: 0, price_out: 0, stock_qty: 0, min_stock: 10, status: "active", vat: false, note: "" }); setShowModal(true); }}>Thêm sản phẩm</Button>
+        <Button onClick={() => { setEditingProduct(null); setForm({ name: "", category: "Ốp lưng", sku: "", barcode: "", brand: "", compatible_devices: [], color: "", images: [], date_import: new Date().toISOString().split("T")[0], price_in: 0, price_out: 0, stock_qty: 0, min_stock: 10, status: "active", vat: false, note: "", supplier_id: null }); setShowModal(true); }}>Thêm sản phẩm</Button>
       </div>
 
       {/* Filters */}
@@ -303,6 +312,7 @@ export default function ProductsPage() {
                 <th className="text-left px-4 py-3 font-medium text-slate-500">Ảnh</th>
                 <th className="text-left px-4 py-3 font-medium text-slate-500">Tên</th>
                 <th className="text-left px-4 py-3 font-medium text-slate-500">Danh mục</th>
+                <th className="text-left px-4 py-3 font-medium text-slate-500">Nhà cung cấp</th>
                 <th className="text-right px-4 py-3 font-medium text-slate-500">Giá nhập</th>
                 <th className="text-right px-4 py-3 font-medium text-slate-500">Giá bán</th>
                 <th className="text-right px-4 py-3 font-medium text-slate-500">Tồn kho</th>
@@ -344,11 +354,16 @@ export default function ProductsPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-slate-600">{product.category}</td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {suppliers.find((s) => s.id === product.supplier_id)?.name ?? (
+                      <span className="text-slate-300">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right tabular-nums text-slate-600">
-                    {formatVND(product.price_in)}
+                    {formatVND(product.price_in, { unit: false })}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums font-medium text-slate-900">
-                    {formatVND(product.price_out)}
+                    {formatVND(product.price_out, { unit: false })}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Badge variant={stockVariant(product)}>{product.stock_qty}</Badge>
@@ -420,6 +435,15 @@ export default function ProductsPage() {
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Thương hiệu</label>
               <Input value={form.brand || ""} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Nhà cung cấp</label>
+              <Select value={form.supplier_id || ""} onChange={(e) => setForm({ ...form, supplier_id: e.target.value || null })}>
+                <option value="">— Chọn nhà cung cấp —</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </Select>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Mã vạch (barcode)</label>

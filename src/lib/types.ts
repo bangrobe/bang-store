@@ -34,6 +34,7 @@ export interface Product {
   status: ProductStatus;
   vat: boolean;
   note?: string;
+  supplierId?: string | null;
 }
 
 export interface Customer {
