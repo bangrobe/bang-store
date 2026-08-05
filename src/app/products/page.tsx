@@ -126,8 +126,8 @@ export default function ProductsPage() {
   const [uploading, setUploading] = useState(false);
 
   // Compress + resize an image client-side using a canvas.
-  // Max dimension 1000px (keep aspect ratio), output JPEG q=0.8.
-  const compressImage = (file: File, maxDim = 1000, quality = 0.8): Promise<File> =>
+  // Max dimension 720px (keep aspect ratio), output JPEG q=0.8.
+  const compressImage = (file: File, maxDim = 720, quality = 0.8): Promise<File> =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onerror = () => reject(new Error("read file failed"));
