@@ -41,8 +41,17 @@ export default function SidebarLayout({
   const SidebarNav = () => (
     <>
       <div className="p-5 border-b border-slate-700">
-        <h1 className="font-bold text-lg">Bang Store</h1>
-        <p className="text-xs text-slate-400 mt-0.5">Phụ kiện điện thoại</p>
+        <div className="flex items-center gap-3">
+          <img
+            src="/icon.svg"
+            alt="Bang Store logo"
+            className="w-9 h-9 rounded-xl shadow-md shrink-0"
+          />
+          <div>
+            <h1 className="font-bold text-lg leading-tight">Bang Store</h1>
+            <p className="text-xs text-slate-400 mt-0.5">Phụ kiện điện thoại</p>
+          </div>
+        </div>
       </div>
 
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
