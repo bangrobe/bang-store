@@ -1,14 +1,24 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { formatVND, formatDateVN } from "@/lib/utils";
-import { mockProducts, mockSuppliers, type Supplier } from "@/lib/mock";
 import { createClient } from "@/lib/supabase";
+import type { Database } from "@/types/database";
+
+type SupplierRow = Database["public"]["Tables"]["suppliers"]["Row"];
+type ProductRow = Database["public"]["Tables"]["products"]["Row"];
+type PurchaseOrderRow = Database["public"]["Tables"]["purchase_orders"]["Row"];
+type PurchaseOrderLineRow = Database["public"]["Tables"]["purchase_order_lines"]["Row"];
+
+type PurchaseWithMeta = PurchaseOrderRow & {
+  supplier: SupplierRow | null;
+  lines: PurchaseOrderLineRow[];
+};
 
 // Sync bridge: push purchase order to Finance App as inventory restock
 async function pushPurchaseToFinanceApp(
@@ -56,6 +66,65 @@ export default function PurchasesPage() {
     { productId: string; qty: number; unitPrice: number }[]
   >([]);
 
+  const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
+  const [products, setProducts] = useState<ProductRow[]>([]);
+  const [purchases, setPurchases] = useState<PurchaseWithMeta[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const supabase = createClient();
+      const [supplierRes, productRes, poRes] = await Promise.all([
+        supabase.from("suppliers").select("*").order("name"),
+        supabase.from("products").select("*").order("name"),
+        supabase
+          .from("purchase_orders")
+          .select("*, supplier:suppliers(name)")
+          .order("po_date", { ascending: false }),
+      ]);
+      if (supplierRes.error) console.error("fetch suppliers:", supplierRes.error);
+      if (productRes.error) console.error("fetch products:", productRes.error);
+      if (poRes.error) console.error("fetch purchase orders:", poRes.error);
+
+      const supplierRows = (supplierRes.data as SupplierRow[]) || [];
+      setSuppliers(supplierRows);
+      setProducts((productRes.data as ProductRow[]) || []);
+
+      const poRows = (poRes.data as (PurchaseOrderRow & {
+        supplier: { name: string } | null;
+      })[]) || [];
+
+      const withMeta: PurchaseWithMeta[] = [];
+      for (const po of poRows) {
+        const { data: lineData, error: lineError } = await supabase
+          .from("purchase_order_lines")
+          .select("*")
+          .eq("purchase_order_id", po.id)
+          .order("id");
+        if (lineError) console.error("fetch po lines:", lineError);
+        withMeta.push({
+          ...po,
+          supplier: po.supplier
+            ? {
+                id: po.supplier_id,
+                name: po.supplier.name,
+                phone: "",
+                tax_code: null,
+                address: null,
+                note: "",
+                created_at: "",
+                updated_at: "",
+              }
+            : null,
+          lines: (lineData as PurchaseOrderLineRow[]) || [],
+        });
+      }
+      setPurchases(withMeta);
+      setLoading(false);
+    })();
+  }, []);
+
   const handleAddLine = () => {
     setLines([
       ...lines,
@@ -88,50 +157,108 @@ export default function PurchasesPage() {
     [lines]
   );
 
-  const handleSubmit = () => {
-    console.log("Submitting purchase:", {
-      supplier: formSupplier,
-      date: formDate,
-      note: formNote,
-      lines,
-      total: purchaseTotal,
-    });
+  const handleSubmit = async () => {
+    if (!formSupplier || lines.length === 0) {
+      alert("Vui lòng chọn nhà cung cấp và thêm ít nhất một dòng sản phẩm");
+      return;
+    }
+
+    setSubmitting(true);
+    const supabase = createClient();
+
+    const { data: poData, error: poError } = await supabase
+      .from("purchase_orders")
+      .insert({
+        supplier_id: formSupplier,
+        po_date: formDate,
+        total: purchaseTotal,
+        note: formNote || null,
+      })
+      .select("id")
+      .single();
+    if (poError) {
+      console.error("insert purchase order:", poError);
+      alert("Lỗi: " + poError.message);
+      setSubmitting(false);
+      return;
+    }
+
+    const poId = (poData as { id: string }).id;
+    const supplierName =
+      suppliers.find((s) => s.id === formSupplier)?.name ?? null;
+
+    const payload = lines
+      .filter((l) => l.productId && l.qty > 0)
+      .map((l) => {
+        const product = products.find((p) => p.id === l.productId);
+        return {
+          purchase_order_id: poId,
+          product_id: l.productId,
+          product_name: product?.name ?? "Sản phẩm",
+          qty: l.qty,
+          unit_price: l.unitPrice,
+          line_total: l.qty * l.unitPrice,
+        };
+      });
+
+    const { error: lineError } = await supabase
+      .from("purchase_order_lines")
+      .insert(payload);
+    if (lineError) {
+      console.error("insert po lines:", lineError);
+      alert("Đã lưu phiếu nhập nhưng lỗi chi tiết: " + lineError.message);
+    }
+
+    // Push sync bridge (fire-and-forget)
+    if (!lineError) {
+      for (const pl of payload) {
+        await pushPurchaseToFinanceApp(
+          poId,
+          pl.purchase_order_id,
+          pl.product_id,
+          pl.qty,
+          formDate,
+          supplierName
+        );
+      }
+    }
+
     setLines([]);
     setFormSupplier("");
     setFormNote("");
-  };
+    setSubmitting(false);
 
-  // Mock purchase history
-  const purchaseHistory = [
-    {
-      id: "PO-001",
-      date: "2026-07-30",
-      supplier: "Công ty TNHH CaseMate Việt Nam",
-      itemCount: 3,
-      total: 1450000,
-    },
-    {
-      id: "PO-002",
-      date: "2026-07-28",
-      supplier: "Anker Việt Nam",
-      itemCount: 5,
-      total: 3200000,
-    },
-    {
-      id: "PO-003",
-      date: "2026-07-25",
-      supplier: "Cửa hàng phụ kiện TPHCM",
-      itemCount: 2,
-      total: 890000,
-    },
-    {
-      id: "PO-004",
-      date: "2026-07-20",
-      supplier: "Sony Audio Việt Nam",
-      itemCount: 1,
-      total: 450000,
-    },
-  ];
+    // Refresh history
+    const { data: newPoRes } = await supabase
+      .from("purchase_orders")
+      .select("*, supplier:suppliers(name)")
+      .eq("id", poId)
+      .single();
+    if (newPoRes) {
+      const poRow = newPoRes as PurchaseOrderRow & {
+        supplier: { name: string } | null;
+      };
+      setPurchases((prev) => [
+        {
+          ...poRow,
+          supplier: poRow.supplier
+            ? {
+                id: poRow.supplier_id,
+                name: poRow.supplier.name,
+                phone: "",
+                tax_code: null,
+                address: null,
+                note: "",
+                created_at: "",
+                updated_at: "",
+              }
+            : null,
+          lines: payload as PurchaseOrderLineRow[],
+        },
+        ...prev,
+      ]);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -159,25 +286,41 @@ export default function PurchasesPage() {
                 </tr>
               </thead>
               <tbody>
-                {purchaseHistory.map((po) => (
-                  <tr
-                    key={po.id}
-                    className="border-b border-slate-50 hover:bg-slate-50"
-                  >
-                    <td className="px-4 py-3 text-slate-600">
-                      {formatDateVN(po.date)}
-                    </td>
-                    <td className="px-4 py-3 text-slate-900">
-                      {po.supplier}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-600">
-                      {po.itemCount}
-                    </td>
-                    <td className="px-4 py-3 text-right font-medium tabular-nums text-slate-900">
-                      {formatVND(po.total)}
+                {loading ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-8 text-center text-sm text-slate-400">
+                      Đang tải...
                     </td>
                   </tr>
-                ))}
+                ) : purchases.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-8 text-center text-sm text-slate-400">
+                      Chưa có phiếu nhập hàng
+                    </td>
+                  </tr>
+                ) : (
+                  purchases.map((po) => (
+                    <tr
+                      key={po.id}
+                      className="border-b border-slate-50 hover:bg-slate-50"
+                    >
+                      <td className="px-4 py-3 text-slate-600">
+                        {formatDateVN(po.po_date)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-900">
+                        {po.supplier?.name ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-slate-600">
+                        {po.lines.length > 0
+                          ? po.lines.reduce((s, l) => s + l.qty, 0)
+                          : 1}
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium tabular-nums text-slate-900">
+                        {formatVND(Number(po.total))}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -208,8 +351,8 @@ export default function PurchasesPage() {
                   required
                 >
                   <option value="">Chọn nhà cung cấp</option>
-                  {mockSuppliers.map((s) => (
-                    <option key={s.id} value={s.name}>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
                       {s.name}
                     </option>
                   ))}
@@ -252,9 +395,9 @@ export default function PurchasesPage() {
                       }
                     >
                       <option value="">Chọn sản phẩm</option>
-                      {mockProducts.map((p) => (
+                      {products.map((p) => (
                         <option key={p.id} value={p.id}>
-                          {p.name} — {formatVND(p.priceIn)}
+                          {p.name} — {formatVND(Number(p.price_in))}
                         </option>
                       ))}
                     </select>
@@ -329,7 +472,9 @@ export default function PurchasesPage() {
             />
 
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-              <Button type="submit">Xác nhận nhập hàng</Button>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? "Đang lưu..." : "Xác nhận nhập hàng"}
+              </Button>
             </div>
           </form>
         </Card>
