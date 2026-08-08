@@ -138,8 +138,14 @@ export default function ReportsPage() {
     1
   );
 
-  // Chart shows only the last 7 days of the selected range; totals use the full range.
-  const chartData = useMemo(() => filteredRevenue.slice(-7), [filteredRevenue]);
+  // Chart shows the last 7 days of the selected range, never future days.
+  const chartData = useMemo(() => {
+    const now = new Date();
+    const pad2 = (n: number) => String(n).padStart(2, "0");
+    const today = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+    const last = dateTo < today ? dateTo : today;
+    return filteredRevenue.filter((d) => d.date <= last).slice(-7);
+  }, [filteredRevenue, dateTo]);
 
   return (
     <div className="space-y-4">
