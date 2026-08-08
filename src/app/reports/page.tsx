@@ -212,7 +212,7 @@ export default function ReportsPage() {
                   return (
                     <div
                       key={d.date}
-                      className="flex-1 flex flex-col items-center gap-1"
+                      className="flex-1 flex flex-col items-center gap-1 h-full justify-end"
                     >
                       <div
                         className="w-full bg-indigo-500 rounded-t-md transition-all duration-300 hover:bg-indigo-600 relative group cursor-pointer"
