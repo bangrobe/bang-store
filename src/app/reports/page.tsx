@@ -109,8 +109,9 @@ export default function ReportsPage() {
     const filled: DailyRevenueRow[] = [];
     const start = new Date(`${dateFrom}T00:00:00`);
     const end = new Date(`${dateTo}T00:00:00`);
+    const pad2 = (n: number) => String(n).padStart(2, "0");
     for (let t = start; t <= end; t.setDate(t.getDate() + 1)) {
-      const key = t.toISOString().slice(0, 10);
+      const key = `${t.getFullYear()}-${pad2(t.getMonth() + 1)}-${pad2(t.getDate())}`;
       filled.push(byDate.get(key) || { date: key, revenue: 0, orders: 0 });
     }
     return filled;
