@@ -138,6 +138,9 @@ export default function ReportsPage() {
     1
   );
 
+  // Chart shows only the last 7 days of the selected range; totals use the full range.
+  const chartData = useMemo(() => filteredRevenue.slice(-7), [filteredRevenue]);
+
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold text-slate-900">
@@ -199,15 +202,15 @@ export default function ReportsPage() {
               Không có dữ liệu trong khoảng thời gian này
             </p>
           ) : (
-            <div className="relative h-48 flex items-end gap-1">
+            <div className="relative h-48">
               {/* Y-axis labels */}
               <div className="absolute left-0 top-0 bottom-8 flex flex-col justify-between text-xs text-slate-400 tabular-nums">
                 <span>{formatVNDCompact(maxRevenue)}</span>
                 <span>{formatVNDCompact(maxRevenue / 2)}</span>
                 <span>0 ₫</span>
               </div>
-              <div className="ml-8 flex-1 flex items-end gap-1 h-full">
-                {filteredRevenue.map((d) => {
+              <div className="ml-8 pr-6 flex items-end gap-1 h-full">
+                {chartData.map((d) => {
                   const height = (Number(d.revenue) / maxRevenue) * 100;
                   return (
                     <div
