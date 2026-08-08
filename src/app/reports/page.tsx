@@ -22,9 +22,27 @@ type SoldRow = {
   total_revenue: number;
 };
 
+function monthBounds() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth(); // 0-based
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return {
+    from: `${year}-${pad(month + 1)}-01`,
+    to: `${year}-${pad(month + 1)}-${pad(lastDay)}`,
+  };
+}
+
+// Parse "YYYY-MM-DD" as local date parts (avoid UTC/timezone drift from new Date()).
+function formatDayLabel(dateStr: string) {
+  const [y, m, d] = dateStr.split("-");
+  return `${Number(d)}/${Number(m)}`;
+}
+
 export default function ReportsPage() {
-  const [dateFrom, setDateFrom] = useState("2026-08-01");
-  const [dateTo, setDateTo] = useState("2026-08-07");
+  const [dateFrom, setDateFrom] = useState(() => monthBounds().from);
+  const [dateTo, setDateTo] = useState(() => monthBounds().to);
   const [revenueData, setRevenueData] = useState<DailyRevenueRow[]>([]);
   const [topProducts, setTopProducts] = useState<SoldRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,11 +100,20 @@ export default function ReportsPage() {
     })();
   }, []);
 
-  // Filter revenue data by date range
+  // Filter revenue data by date range, filling missing days with 0
   const filteredRevenue = useMemo(() => {
-    return revenueData.filter(
+    const inRange = revenueData.filter(
       (d) => d.date >= dateFrom && d.date <= dateTo
     );
+    const byDate = new Map(inRange.map((d) => [d.date, d]));
+    const filled: DailyRevenueRow[] = [];
+    const start = new Date(`${dateFrom}T00:00:00`);
+    const end = new Date(`${dateTo}T00:00:00`);
+    for (let t = start; t <= end; t.setDate(t.getDate() + 1)) {
+      const key = t.toISOString().slice(0, 10);
+      filled.push(byDate.get(key) || { date: key, revenue: 0, orders: 0 });
+    }
+    return filled;
   }, [dateFrom, dateTo, revenueData]);
 
   const totalRevenue = useMemo(
@@ -196,7 +223,7 @@ export default function ReportsPage() {
                         </div>
                       </div>
                       <span className="text-xs text-slate-400">
-                        {new Date(d.date).getDate()}/{new Date(d.date).getMonth() + 1}
+                        {formatDayLabel(d.date)}
                       </span>
                     </div>
                   );
