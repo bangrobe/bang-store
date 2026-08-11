@@ -292,7 +292,7 @@ export default function OrdersPage() {
                         {formatDateTimeVN(order.order_time)}
                       </td>
                       <td className="px-4 py-3 text-right font-medium tabular-nums text-slate-900">
-                        {formatVND(Number(order.total))}
+                        {formatVND(Number(order.actual_total ?? order.total))}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <Badge variant={paymentVariant(order.payment_method)}>

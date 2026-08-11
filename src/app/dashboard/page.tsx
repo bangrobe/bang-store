@@ -27,6 +27,7 @@ type OrderRow = {
   order_number: number;
   order_time: string;
   total: number;
+  actual_total: number | null;
   payment_method: string;
 };
 
@@ -65,7 +66,7 @@ export default function DashboardPage() {
         supabase.from("products").select("*").order("name").limit(100),
         supabase
           .from("orders")
-          .select("id, order_number, order_time, total, payment_method")
+          .select("id, order_number, order_time, total, actual_total, payment_method")
           .order("order_number", { ascending: false })
           .limit(8),
         supabase
@@ -94,7 +95,10 @@ export default function DashboardPage() {
     const todayStr = date;
     return orders
       .filter((o) => o.order_time?.startsWith(todayStr))
-      .reduce((sum, o) => sum + Number(o.total || 0), 0);
+      .reduce(
+        (sum, o) => sum + Number(o.actual_total ?? o.total ?? 0),
+        0
+      );
   }, [orders, date]);
 
   const todayOrders = useMemo(
@@ -190,7 +194,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-semibold text-slate-900 tabular-nums">
-                          {formatVND(Number(order.total))}
+                          {formatVND(Number(order.actual_total ?? order.total))}
                         </p>
                         <Badge
                           variant={
